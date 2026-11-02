@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.jonathancruzate.metamusevoicemail">
+
+    <!-- Voicemail provider: ADD_VOICEMAIL is the documented dangerous floor to
+         talk to the provider at all. READ/WRITE_VOICEMAIL are
+         signature|privileged|role: they only become effective while this app
+         holds ROLE_DIALER (AOSP pre-grants them to the dialer role holder). -->
+    <uses-permission android:name="com.android.voicemail.permission.ADD_VOICEMAIL" />
+    <uses-permission android:name="com.android.voicemail.permission.READ_VOICEMAIL" />
+    <uses-permission android:name="com.android.voicemail.permission.WRITE_VOICEMAIL" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+
+    <application
+        android:label="Muse Voicemail"
+        android:icon="@android:drawable/sym_action_call"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material">
+
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".DiagnosticsActivity" android:exported="false" />
+
+        <!-- ROLE_DIALER qualification: an activity handling ACTION_DIAL with a
+             real dial pad. -->
+        <activity android:name=".DialActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tel" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".InCallActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true" />
+
+        <!-- ROLE_DIALER qualification: a fully bound InCallService with
+             incoming + ongoing call UI (InCallActivity). -->
+        <service android:name=".MuseInCallService"
+            android:permission="android.permission.BIND_INCALL_SERVICE"
+            android:exported="true">
+            <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+
+        <!-- Telephony binds this ONLY for the default dialer. Receives OMTP /
+             Verizon VVM3 visual-voicemail SMS after we set the SMS filter. -->
+        <service android:name=".MuseVvmService"
+            android:permission="android.permission.BIND_VISUAL_VOICEMAIL_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telephony.VisualVoicemailService" />
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>

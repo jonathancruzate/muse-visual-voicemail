@@ -1,0 +1,134 @@
+# Muse Voicemail
+
+A sideloaded Android app that reads and displays **visual voicemail** from the
+shared Android voicemail provider (`content://com.android.voicemail/voicemail`),
+built for a Galaxy S24+ whose stock client is Samsung Visual Voicemail
+(`com.samsung.vvm`, v20.1.00.17).
+
+- **Package:** `com.jonathancruzate.metamusevoicemail`
+- **Version:** 1.0.0 (versionCode 1), minSdk 29, targetSdk 35
+- **APK:** `app/Muse-Visual-Voicemail-1.0.0.apk` — 25,001 bytes,
+  SHA-256 `1279979e94e78c7c0da55b2cc55fb4084e7bd8a482837b0770e4144eff29d66b`
+- **Signing cert SHA-256:** `e9505aa1e0087583c5b3da1dc59ce533f84b719c2da4abb01daffc230cc0f32b`
+  (CN=Muse Voicemail, O=JonathanCruzate, C=US; keystore stays local, never in git)
+
+## Why it is built this way — the evidence (REA + API research)
+
+Built 2026-11-02 following the REA → Craft Anything Study/Build/Check/Refine
+pattern (Craft Anything itself is clone-only in this environment per its
+adoption gate; REA supplied the evidence, the loop was run manually). Per
+Jonathan's standing order of 2026-11-02, Craft Anything runs in **Deep mode
+always for personal tools** like this one — the REA pass below served as
+this build's Deep study.
+
+**REA pass on Samsung's app** (APKMirror build 20.1.00.12 — the newest mirror
+build; 20.1.00.17 is not mirrored — sha256
+`78a1d1705804b6aa31198141be80b1ef227cbef92741488c79c741b6afeebb57`, Samsung
+platform-signed, REA/jadx evidence `ev_759bdcab…`):
+
+- Samsung's inbox lives in its **own** provider
+  (`com.samsung.vvm.provider`), exported but gated by
+  `com.samsung.vvm.permission.ACCESS_PROVIDER` with
+  `protectionLevel="signature"`. **No third-party app can ever read it.**
+  Attachments are walled the same way.
+- Samsung does **not** use the platform `VisualVoicemailService` (zero DEX
+  hits). Its sync is a private stack: built-in IMAP client, OMTP-style sync
+  SMS receivers, carrier legs for Verizon / T-Mobile (Samsung CloudMessage
+  store) / AT&T / Google Fi. Transcriptions live in its private `Message`
+  table (with an `on_device_transcription` column).
+- It **does** reference `content://com.android.voicemail/voicemail` and holds
+  `ADD/READ/WRITE_VOICEMAIL` — i.e. it writes to the shared provider on at
+  least some legs.
+
+**Android API research** (developer.android.com, full dossier in the project
+notes):
+
+- `READ_VOICEMAIL` / `WRITE_VOICEMAIL` are
+  **`signature|privileged|role`** — not runtime-grantable. The `role` leg is
+  `ROLE_DIALER`: AOSP pre-grants both permissions to the default-dialer role
+  holder. That is the **only self-serve lane** for a sideloaded reader
+  (carrier privileges and platform signature are unavailable).
+- Denied callers get a `SecurityException` from `query()`, not an empty
+  cursor — the app distinguishes *blocked* vs *0 rows* vs *source-scoped*.
+- Verizon VVM is **VVM3**, not plain OMTP: no ACTIVATE SMS; a STATUS SMS
+  fetches IMAP credentials; client prefix family `//VZWVVM`.
+
+## What the app does
+
+**Tier 1 — reader + diagnostics (works immediately, no role):**
+- Lists whatever the shared provider exposes to it: number, date, duration,
+  transcription text (when the source populated it), read/new state, and the
+  **source package** of each row — which is how we learn on-device whether
+  `com.samsung.vvm` mirrors messages into the shared provider on this carrier.
+- Plays audio via `MediaPlayer.setDataSource(context, itemUri)` for rows
+  with `has_content = 1`; marks rows read on play (best-effort).
+- A **Diagnostics** screen that reports, live and separately: dialer-role
+  state, default dialer package, per-permission grant state, carrier
+  privileges, the system's visual-voicemail package, carrier-config VVM type
+  / carrier VVM package / destination number, the verbatim query outcome,
+  a row census by source package, the Status table's
+  configuration/data/notification channel states, and the VVM service event
+  log. One-tap copy (counts/packages/states only — no message content).
+
+**Tier 2 — default-dialer takeover (user-initiated, behind a warning dialog):**
+- Ships the role-qualification components: a real dial pad (`ACTION_DIAL`),
+  an `InCallService` with incoming/ongoing call UI, and a
+  `VisualVoicemailService` that, on cell-service connect, installs the VVM
+  SMS filter using the SIM's actual carrier-config values (OMTP `//VVM` vs
+  Verizon VVM3 `//VZWVVM`) and records every VVM SMS event — **prefix and
+  field key names only**, because STATUS fields can carry IMAP credentials.
+- On role grant, `READ/WRITE_VOICEMAIL` become effective and Tier 1 becomes
+  a full reader.
+- Honest trade-off, stated in the app before the request: while this app
+  holds the role, Samsung's VVM sync stops and new voicemail arrives through
+  this app's VVM service; switching back is Settings → Apps → Default apps.
+
+**Not yet built (Tier 2b, deliberate):** our own VVM3 STATUS → IMAP sync
+inserting rows as a voicemail source. It is only worth building if Tier 2a
+diagnostics show Samsung does *not* mirror usable rows into the shared
+provider on this phone/carrier.
+
+## Build (recreation)
+
+Framework-only — **no AndroidX**, so the raw build cannot hit the Kotlin
+Multiplatform empty-jar trap. Toolchain: Android SDK build-tools 35.0.0 +
+platform android-35 + Temurin JDK 21.
+
+```bash
+cd app
+./build.sh   # aapt2 link -> javac (source 11, android.jar on classpath —
+             # NOT -bootclasspath, which breaks lambdas on JDK 21)
+             # -> d8 -> zipalign -> apksigner; verifies and prints sha256
+```
+
+Two build traps are encoded in `build.sh` comments: (1) `classes.dex` must
+be zipped from inside `build/dex/` so it lands at the APK **root**;
+(2) the javac classpath note above.
+
+## Install & first run
+
+1. Sideload `Muse-Visual-Voicemail-1.0.0.apk` on the phone (Files → tap → allow
+   install from that source).
+2. Open it, grant the runtime permissions it asks for.
+3. Read the status line: it will say whether Android blocked the query or
+   returned rows. Open **Diagnostics** and copy the report back to Muse —
+   that settles whether Samsung mirrors voicemail into the shared provider
+   on this carrier, with and without the dialer role.
+4. Only if needed: tap **Become default phone app** (read the trade-offs in
+   the dialog first), grant the role, and refresh.
+
+## Layout
+
+```
+app/AndroidManifest.xml          package, permissions, role-qualification components
+app/src/com/jonathancruzate/metamusevoicemail/
+  MainActivity.java              reader: query, list, playback, mark-read, role request
+  DiagnosticsActivity.java       the full live diagnostic battery + copy export
+  DialActivity.java              dial pad (ACTION_DIAL)
+  MuseInCallService.java         InCallService binding
+  InCallActivity.java            incoming/ongoing call UI
+  MuseVvmService.java            VisualVoicemailService: SMS filter + VVM SMS event log
+  VmLog.java                     metadata-only on-device event log
+app/build.sh                     raw toolchain build (see traps above)
+app/keystore/                    local only — NEVER committed
+```
