@@ -67,3 +67,23 @@ First real-device run of Muse Voicemail v1.0.0 on Jonathan's Galaxy S24+
 Install v1.0.1 → Diagnostics (pre-role scoped results) → tap "Become
 default phone app", grant ROLE_DIALER → Diagnostics again. The post-role
 unscoped row census by source package is the decisive readout.
+
+## v1.0.1 pre-role results (2026-11-03, second screenshot)
+
+Jonathan installed v1.0.1 and re-ran Diagnostics (role still not held):
+
+- **Scoped to us: SUCCESS — total rows visible: 0** (0 without audio,
+  0 without transcription). The source_package lane works exactly as the
+  provider's error message and the VoicemailContract docs said it would;
+  0 rows is the expected result — this app has never inserted a row.
+- Unscoped: same SecurityException as v1.0.0 (expected pre-role).
+- Scoped to com.samsung.vvm: SecurityException — "Package
+  com.jonathancruzate.metamusevoicemail cannot perform this operation
+  for com.samsung.vvm. Requires WRITE_VOICEMAIL permission." So a
+  source-scoped query only ever works for the caller's OWN package;
+  reading any other source, scoped or not, requires the role grant.
+- The Interpretation section rendered as designed.
+
+Conclusion: the pre-role experiment is complete. The only remaining
+test is post-role: grant ROLE_DIALER, re-run Diagnostics, and read the
+unscoped row census by source package.
