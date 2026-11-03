@@ -7,9 +7,10 @@ built for a Galaxy S24+ whose stock client is Samsung Visual Voicemail
 
 - **Package:** `com.jonathancruzate.metamusevoicemail`
 - **Version:** 1.0.1 (versionCode 2), minSdk 29, targetSdk 35
-- **APK:** `app/Muse-Visual-Voicemail-1.0.1.apk` — 28,013 bytes,
-  SHA-256 `69cc6baf1f09cdbc43ee409de5b3c677036c7340be42e364b9932a7c9eb8a89c8`
-  (v1.0.0 was 25,001 bytes, SHA-256 `1279979e…d66b`)
+- **APK:** `app/Muse-Visual-Voicemail-1.0.1.apk` — 25,001 bytes,
+  SHA-256 `f11d7c89335767b4597e12eabda51d464fc489f672cac92918c472c0f4b82bc8`
+  (v1.0.0 was also 25,001 bytes, SHA-256 `1279979e…d66b` — same size,
+  different build; the hashes are the distinguishing check)
 - **Signing cert SHA-256:** `e9505aa1e0087583c5b3da1dc59ce533f84b719c2da4abb01daffc230cc0f32b`
   (CN=Muse Voicemail, O=JonathanCruzate, C=US; keystore stays local, never in git)
 

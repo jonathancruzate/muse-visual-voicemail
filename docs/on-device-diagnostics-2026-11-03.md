@@ -54,9 +54,13 @@ First real-device run of Muse Voicemail v1.0.0 on Jonathan's Galaxy S24+
   SecurityException instead of stopping at the error.
 - Diagnostics adds a plain-language Interpretation section covering
   1–3 above.
-- APK: Muse-Visual-Voicemail-1.0.1.apk, 28,013 bytes, SHA-256
-  69cc6baf1f09cdbc43ee409de5b3c677036c7340be42e364b9932a7c9eb8a89c8,
+- APK: Muse-Visual-Voicemail-1.0.1.apk, 25,001 bytes, SHA-256
+  f11d7c89335767b4597e12eabda51d464fc489f672cac92918c472c0f4b82bc8,
   same signing cert as v1.0.0 (e9505aa1…f32b), versionCode 2.
+  (Correction, 2026-11-03: an early draft of this doc and of the README
+  carried a wrong size/hash — 28,013 / 69cc6baf… — from a misread build
+  report. The values above are the verified on-disk build output,
+  re-checked with sha256sum against the shipped file.)
 
 ## Next on-device step
 
