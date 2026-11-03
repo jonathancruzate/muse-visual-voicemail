@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.VoicemailContract;
 import android.telecom.TelecomManager;
@@ -84,13 +85,15 @@ public class DiagnosticsActivity extends Activity {
             }
         }
 
+        String vvmType = null;
         CarrierConfigManager ccm = getSystemService(CarrierConfigManager.class);
         if (ccm != null) {
             try {
                 android.os.PersistableBundle cfg = ccm.getConfig();
                 if (cfg != null) {
+                    vvmType = cfg.getString(CarrierConfigManager.KEY_VVM_TYPE_STRING, "?");
                     sb.append("Carrier VVM type: ")
-                      .append(cfg.getString(CarrierConfigManager.KEY_VVM_TYPE_STRING, "?")).append('\n');
+                      .append(vvmType).append('\n');
                     sb.append("Carrier VVM package: ")
                       .append(cfg.getString(CarrierConfigManager.KEY_CARRIER_VVM_PACKAGE_NAME_STRING, "?")).append('\n');
                     sb.append("VVM destination number: ")
@@ -102,18 +105,70 @@ public class DiagnosticsActivity extends Activity {
         }
         sb.append('\n');
 
-        // Raw provider query outcome, verbatim.
+        // Plain-language interpretation of the state above (v1.0.1).
+        sb.append("— Interpretation —\n");
+        boolean roleHeld = rm != null && rm.isRoleHeld(RoleManager.ROLE_DIALER);
+        if (!roleHeld) {
+            sb.append("Not the default phone app yet, so READ/WRITE_VOICEMAIL are NOT "
+                    + "effective (they are signature|privileged|role permissions). "
+                    + "An UNSCOPED query is therefore expected to throw SecurityException. "
+                    + "The source-scoped queries below are the correct pre-role test.\n");
+        } else {
+            sb.append("Default phone app held: READ/WRITE_VOICEMAIL should now be "
+                    + "effective and the unscoped query below is the full test — "
+                    + "its row census by source package settles whether Samsung "
+                    + "mirrors voicemail into the shared provider.\n");
+        }
+        if ("vvm_type_disabled".equals(vvmType)) {
+            sb.append("Carrier VVM type is DISABLED for this carrier/SIM: the Android "
+                    + "platform visual-voicemail stack (OMTP/VVM3 via "
+                    + "VisualVoicemailService) is not activated by the carrier here. "
+                    + "Voicemail on this line is handled by the carrier/Samsung private "
+                    + "stack instead. That does NOT block reading rows already in the "
+                    + "shared provider after the role grant — it means our own "
+                    + "platform VVM sync is unlikely to fetch new mail on this carrier.\n");
+        }
+        sb.append('\n');
+
+        // Raw provider query outcomes, verbatim — unscoped AND source-scoped.
+        // v1.0.0 queried only the unscoped URI, which the provider rejects
+        // without WRITE_VOICEMAIL with "Please set query parameter
+        // 'source_package' in the URI" (on-device, 2026-11-03, Google Fi).
+        // Per VoicemailContract, a source-scoped URI (buildSourceUri) is the
+        // documented lane for a caller holding only ADD_VOICEMAIL.
         sb.append("— Voicemails table —\n");
+        queryVoicemails(sb, "unscoped (all sources)",
+                VoicemailContract.Voicemails.CONTENT_URI);
+        queryVoicemails(sb, "scoped to us (" + getPackageName() + ")",
+                VoicemailContract.Voicemails.buildSourceUri(getPackageName()));
+        queryVoicemails(sb, "scoped to com.samsung.vvm",
+                VoicemailContract.Voicemails.buildSourceUri("com.samsung.vvm"));
+        queryVoicemails(sb, "scoped to com.samsung.android.incallui",
+                VoicemailContract.Voicemails.buildSourceUri("com.samsung.android.incallui"));
+
+        sb.append("\n— Status table —\n");
+        queryStatus(sb, "unscoped (all sources)", VoicemailContract.Status.CONTENT_URI);
+        queryStatus(sb, "scoped to us (" + getPackageName() + ")",
+                VoicemailContract.Status.buildSourceUri(getPackageName()));
+        queryStatus(sb, "scoped to com.samsung.vvm",
+                VoicemailContract.Status.buildSourceUri("com.samsung.vvm"));
+
+        sb.append("\n— VVM service event log —\n").append(VmLog.read(this));
+        return sb.toString();
+    }
+
+    private void queryVoicemails(StringBuilder sb, String label, Uri uri) {
+        sb.append("[").append(label).append("] ").append(uri).append('\n');
         Cursor c = null;
         try {
-            c = getContentResolver().query(VoicemailContract.Voicemails.CONTENT_URI,
+            c = getContentResolver().query(uri,
                     new String[]{ VoicemailContract.Voicemails._ID,
                             VoicemailContract.Voicemails.SOURCE_PACKAGE,
                             VoicemailContract.Voicemails.HAS_CONTENT,
                             VoicemailContract.Voicemails.TRANSCRIPTION },
                     null, null, null);
             if (c == null) {
-                sb.append("query returned null cursor\n");
+                sb.append("  query returned null cursor\n");
             } else {
                 Map<String, Integer> bySource = new HashMap<>();
                 int noAudio = 0, noTranscript = 0, total = 0;
@@ -125,23 +180,25 @@ public class DiagnosticsActivity extends Activity {
                     String t = c.getString(3);
                     if (t == null || t.trim().isEmpty()) noTranscript++;
                 }
-                sb.append("total rows visible: ").append(total).append('\n');
+                sb.append("  total rows visible: ").append(total).append('\n');
                 for (Map.Entry<String, Integer> e : bySource.entrySet()) {
-                    sb.append("  source ").append(e.getKey()).append(": ").append(e.getValue()).append('\n');
+                    sb.append("    source ").append(e.getKey()).append(": ").append(e.getValue()).append('\n');
                 }
-                sb.append("rows without audio: ").append(noAudio).append('\n');
-                sb.append("rows without transcription: ").append(noTranscript).append('\n');
+                sb.append("  rows without audio: ").append(noAudio).append('\n');
+                sb.append("  rows without transcription: ").append(noTranscript).append('\n');
             }
         } catch (SecurityException se) {
-            sb.append("SecurityException: ").append(se.getMessage()).append('\n');
+            sb.append("  SecurityException: ").append(se.getMessage()).append('\n');
         } catch (Exception e) {
-            sb.append("error: ").append(e).append('\n');
+            sb.append("  error: ").append(e).append('\n');
         } finally { if (c != null) c.close(); }
+    }
 
-        sb.append("\n— Status table —\n");
+    private void queryStatus(StringBuilder sb, String label, Uri uri) {
+        sb.append("[").append(label).append("] ").append(uri).append('\n');
         Cursor s = null;
         try {
-            s = getContentResolver().query(VoicemailContract.Status.CONTENT_URI,
+            s = getContentResolver().query(uri,
                     new String[]{ VoicemailContract.Status.SOURCE_PACKAGE,
                             VoicemailContract.Status.SOURCE_TYPE,
                             VoicemailContract.Status.CONFIGURATION_STATE,
@@ -149,27 +206,24 @@ public class DiagnosticsActivity extends Activity {
                             VoicemailContract.Status.NOTIFICATION_CHANNEL_STATE },
                     null, null, null);
             if (s == null) {
-                sb.append("query returned null cursor\n");
+                sb.append("  query returned null cursor\n");
             } else if (s.getCount() == 0) {
-                sb.append("no status rows (no source has reported state)\n");
+                sb.append("  no status rows (no source has reported state)\n");
             } else {
                 while (s.moveToNext()) {
-                    sb.append("source=").append(s.getString(0))
+                    sb.append("  source=").append(s.getString(0))
                       .append(" type=").append(s.getString(1))
                       .append(" config=").append(s.getInt(2))
                       .append(" data=").append(s.getInt(3))
                       .append(" notify=").append(s.getInt(4)).append('\n');
                 }
-                sb.append("(config: 0=OK? see VoicemailContract.Status constants; "
+                sb.append("  (config: 0=OK? see VoicemailContract.Status constants; "
                         + "data 2=bad configuration/credentials, 1=no connection)\n");
             }
         } catch (SecurityException se) {
-            sb.append("SecurityException: ").append(se.getMessage()).append('\n');
+            sb.append("  SecurityException: ").append(se.getMessage()).append('\n');
         } catch (Exception e) {
-            sb.append("error: ").append(e).append('\n');
+            sb.append("  error: ").append(e).append('\n');
         } finally { if (s != null) s.close(); }
-
-        sb.append("\n— VVM service event log —\n").append(VmLog.read(this));
-        return sb.toString();
     }
 }

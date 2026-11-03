@@ -6,9 +6,10 @@ built for a Galaxy S24+ whose stock client is Samsung Visual Voicemail
 (`com.samsung.vvm`, v20.1.00.17).
 
 - **Package:** `com.jonathancruzate.metamusevoicemail`
-- **Version:** 1.0.0 (versionCode 1), minSdk 29, targetSdk 35
-- **APK:** `app/Muse-Visual-Voicemail-1.0.0.apk` — 25,001 bytes,
-  SHA-256 `1279979e94e78c7c0da55b2cc55fb4084e7bd8a482837b0770e4144eff29d66b`
+- **Version:** 1.0.1 (versionCode 2), minSdk 29, targetSdk 35
+- **APK:** `app/Muse-Visual-Voicemail-1.0.1.apk` — 28,013 bytes,
+  SHA-256 `69cc6baf1f09cdbc43ee409de5b3c677036c7340be42e364b9932a7c9eb8a89c8`
+  (v1.0.0 was 25,001 bytes, SHA-256 `1279979e…d66b`)
 - **Signing cert SHA-256:** `e9505aa1e0087583c5b3da1dc59ce533f84b719c2da4abb01daffc230cc0f32b`
   (CN=Muse Voicemail, O=JonathanCruzate, C=US; keystore stays local, never in git)
 
@@ -105,10 +106,42 @@ Two build traps are encoded in `build.sh` comments: (1) `classes.dex` must
 be zipped from inside `build/dex/` so it lands at the APK **root**;
 (2) the javac classpath note above.
 
+## On-device findings — first diagnostics (2026-11-03, v1.0.0)
+
+Jonathan installed v1.0.0 and sent the Diagnostics screenshot:
+
+- **Carrier is Google Fi** (the build research assumed Verizon — corrected
+  here; the VVM3 notes above are background only, not this line's path).
+- **Carrier VVM type: `vvm_type_disabled`**, carrier VVM package and
+  destination number empty — the Android platform VVM stack is not
+  carrier-activated on this SIM. Samsung's app serves Fi voicemail through
+  its own private leg (consistent with the REA dossier's Google Fi leg).
+  Consequence: our platform `VisualVoicemailService` OMTP sync is unlikely
+  to fetch new mail on Fi; the live question remains whether rows exist in
+  the shared provider, which only the post-role unscoped query settles.
+- Default dialer is still Samsung (`com.samsung.android.dialer`);
+  `ROLE_DIALER` not held, so READ/WRITE_VOICEMAIL show NOT granted — the
+  expected pre-role state, not a defect.
+- System visual-voicemail package: `com.samsung.android.incallui`.
+
+## v1.0.1 changes (2026-11-03)
+
+- **Bug fixed:** v1.0.0 queried only the *unscoped* provider URI, which the
+  provider rejects without WRITE_VOICEMAIL, verbatim: *"Please set query
+  parameter 'source_package' in the URI."* Diagnostics now runs unscoped
+  **and** source-scoped queries (`Voicemails.buildSourceUri` /
+  `Status.buildSourceUri`) for our package, `com.samsung.vvm`, and
+  `com.samsung.android.incallui`, each reported separately; the main screen
+  falls back to the own-package scoped query on `SecurityException` instead
+  of stopping at the error.
+- Diagnostics adds a plain-language **Interpretation** section (pre-role vs
+  post-role expectations, and what `vvm_type_disabled` means on Fi).
+
 ## Install & first run
 
-1. Sideload `Muse-Visual-Voicemail-1.0.0.apk` on the phone (Files → tap → allow
-   install from that source).
+1. Sideload `Muse-Visual-Voicemail-1.0.1.apk` on the phone (Files → tap → allow
+   install from that source). Upgrading from 1.0.0 keeps the same signing
+   cert, so it installs in place.
 2. Open it, grant the runtime permissions it asks for.
 3. Read the status line: it will say whether Android blocked the query or
    returned rows. Open **Diagnostics** and copy the report back to Muse —

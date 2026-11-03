@@ -181,8 +181,43 @@ public class MainActivity extends Activity {
                     VoicemailContract.Voicemails.DELETED + " = 0", null,
                     VoicemailContract.Voicemails.DATE + " DESC");
         } catch (SecurityException se) {
-            sb.append("\nAndroid blocked the read:\n").append(se.getMessage())
-              .append("\n\nVoicemail read permission is signature/privileged/role-only. "
+            // v1.0.1: the provider's own message says to set the
+            // 'source_package' query parameter. Fall back to the documented
+            // source-scoped query for OUR package (the lane for a caller
+            // holding only ADD_VOICEMAIL) before declaring the read blocked —
+            // v1.0.0 stopped at the exception and never tried it.
+            sb.append("\nAndroid blocked the unscoped read:\n").append(se.getMessage()).append('\n');
+            Cursor sc = null;
+            try {
+                sc = getContentResolver().query(
+                        VoicemailContract.Voicemails.buildSourceUri(getPackageName()),
+                        projection,
+                        VoicemailContract.Voicemails.DELETED + " = 0", null,
+                        VoicemailContract.Voicemails.DATE + " DESC");
+                if (sc != null) {
+                    while (sc.moveToNext()) {
+                        Vm vm = new Vm();
+                        vm.id = sc.getLong(0);
+                        vm.number = sc.getString(1);
+                        vm.date = sc.getLong(2);
+                        vm.duration = sc.getLong(3);
+                        vm.transcription = sc.getString(4);
+                        vm.hasContent = sc.getInt(5) == 1;
+                        vm.mime = sc.getString(6);
+                        vm.read = sc.getInt(7) == 1;
+                        vm.sourcePackage = sc.getString(8);
+                        rows.add(vm);
+                    }
+                }
+                sb.append("\nSource-scoped read (our package only) succeeded: ")
+                  .append(rows.size()).append(" row(s) — these are only messages "
+                        + "this app itself has inserted, so 0 is expected before "
+                        + "we ever act as a voicemail source.\n");
+            } catch (Exception scopedErr) {
+                sb.append("\nSource-scoped read also failed: ").append(scopedErr).append('\n');
+            } finally { if (sc != null) sc.close(); }
+            sb.append("\nFull read of other sources' voicemail needs the dialer role: "
+                    + "voicemail read permission is signature/privileged/role-only. "
                     + "Tap “Become default phone app” and grant the role — that is the "
                     + "supported way in for a sideloaded app. Diagnostics has the full picture.");
             status.setText(sb.toString());
