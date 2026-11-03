@@ -31,6 +31,13 @@
 
         <activity android:name=".DiagnosticsActivity" android:exported="false" />
 
+        <!-- v1.2.0: headless export for the ADB automation lane. Started via
+             `am start`, writes Download/MuseVoicemailExport.txt, finishes. -->
+        <activity android:name=".ExportActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- ROLE_DIALER qualification: an activity handling ACTION_DIAL with a
              real dial pad. -->
         <activity android:name=".DialActivity" android:exported="true">

@@ -13,8 +13,8 @@ BT="$SDK/build-tools/35.0.0"
 ANDROID_JAR="$SDK/platforms/android-35/android.jar"
 KS="keystore/musevvm.keystore"
 KS_PASS_FILE="keystore/keystore-password.txt"
-VERSION_CODE=3
-VERSION_NAME="1.1.0"
+VERSION_CODE=4
+VERSION_NAME="1.2.0"
 
 rm -rf build
 mkdir -p build/gen build/classes build/dex keystore

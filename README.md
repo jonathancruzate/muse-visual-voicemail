@@ -6,11 +6,12 @@ built for a Galaxy S24+ whose stock client is Samsung Visual Voicemail
 (`com.samsung.vvm`, v20.1.00.17).
 
 - **Package:** `com.jonathancruzate.metamusevoicemail`
-- **Version:** 1.1.0 (versionCode 3), minSdk 29, targetSdk 35
-- **APK:** `app/Muse-Visual-Voicemail-1.1.0.apk` — 25,001 bytes,
-  SHA-256 `d91286fc88be942b19c42283c0042698722ac5437920516e56f300b5302b5b2b`
-  (v1.0.1: 25,001 bytes, SHA-256 `f11d7c89…b82bc8`; v1.0.0: 25,001 bytes,
-  SHA-256 `1279979e…d66b` — all three builds land on the same padded size;
+- **Version:** 1.2.0 (versionCode 4), minSdk 29, targetSdk 35
+- **APK:** `app/Muse-Visual-Voicemail-1.2.0.apk` — 29,097 bytes,
+  SHA-256 `e1c46b7dd49192e39028f8b18e57352ba1e05c043678663d3d2ac557dd88b424`
+  (v1.1.0: 25,001 bytes, SHA-256 `d91286fc…b5b2b`; v1.0.1: 25,001 bytes,
+  SHA-256 `f11d7c89…b82bc8`; v1.0.0: 25,001 bytes, SHA-256 `1279979e…d66b`
+  — the 1.0.x/1.1.0 builds coincidentally land on the same padded size;
   the hashes are the distinguishing check)
 - **Signing cert SHA-256:** `e9505aa1e0087583c5b3da1dc59ce533f84b719c2da4abb01daffc230cc0f32b`
   (CN=Muse Voicemail, O=JonathanCruzate, C=US; keystore stays local, never in git)
@@ -151,6 +152,34 @@ Jonathan granted ROLE_DIALER and re-ran Diagnostics + the main list:
   the role to read, hand it back so Samsung/Fi keep handling new mail.
   v1.1.0's Export exists to extract the inbox during a borrow.
 
+## v1.2.0 changes (2026-11-03) — automation
+
+- **ExportActivity (headless export):** an exported, translucent activity
+  started over ADB (`am start -n
+  com.jonathancruzate.metamusevoicemail/.ExportActivity`) that queries the
+  provider and writes one canonical file, `Download/MuseVoicemailExport.txt`,
+  replacing the previous export. The file is written even when the read
+  fails, with a machine-readable header (`status: OK | NO_ROLE |
+  QUERY_BLOCKED`, `rows`, `max_id`, `newest_date_ms`) so the pulling script
+  always learns the outcome from the file itself. MediaStore Downloads
+  needs no storage permission for the app's own files, and `adb pull`
+  reads `/sdcard/Download/` without run-as. No clipboard, no share sheet.
+- **`automation/voicemail-borrow.sh`:** the full automated borrow cycle —
+  ADB role borrow (`cmd role add-role-holder`) → fire ExportActivity →
+  pull the export → restore the previous default dialer. Restore is
+  trap-guaranteed on every exit path and runs explicitly before the
+  success verdict is printed; if the role was already Muse's on entry,
+  it is left exactly as found. New rows (provider `_ID` above the last
+  run's max) are split into a `.new.txt` sibling for triage. Exit codes
+  distinguish lane-down (3), shell-role-blocked (4), export-missing (5),
+  and restore-failed (6).
+- **Trigger:** a new carrier-voicemail notification (Google Fi app /
+  Samsung Phone) wakes the notification-drain worker, which runs the
+  borrow script and triages the new rows (registry trigger
+  `voicemail-new`, Jonathan's order 2026-11-03: "trigger on new
+  voicemail notifications"). Samsung Phone stays the default dialer
+  between borrows, so Fi/Samsung keep handling new mail.
+
 ## v1.1.0 changes (2026-11-03)
 
 - **Export all (text)** button on the main screen: formats every loaded
@@ -174,7 +203,7 @@ Jonathan granted ROLE_DIALER and re-ran Diagnostics + the main list:
 
 ## Install & first run
 
-1. Sideload `Muse-Visual-Voicemail-1.1.0.apk` on the phone (Files → tap → allow
+1. Sideload `Muse-Visual-Voicemail-1.2.0.apk` on the phone (Files → tap → allow
    install from that source). Upgrading keeps the same signing
    cert, so it installs in place — and an in-place upgrade keeps the
    dialer role if the app currently holds it.
@@ -192,6 +221,7 @@ Jonathan granted ROLE_DIALER and re-ran Diagnostics + the main list:
 app/AndroidManifest.xml          package, permissions, role-qualification components
 app/src/com/jonathancruzate/metamusevoicemail/
   MainActivity.java              reader: query, list, playback, mark-read, role request
+  ExportActivity.java            v1.2.0 headless export → Download/MuseVoicemailExport.txt
   DiagnosticsActivity.java       the full live diagnostic battery + copy export
   DialActivity.java              dial pad (ACTION_DIAL)
   MuseInCallService.java         InCallService binding
@@ -200,4 +230,5 @@ app/src/com/jonathancruzate/metamusevoicemail/
   VmLog.java                     metadata-only on-device event log
 app/build.sh                     raw toolchain build (see traps above)
 app/keystore/                    local only — NEVER committed
+automation/voicemail-borrow.sh   ADB borrow → export → pull → restore cycle
 ```

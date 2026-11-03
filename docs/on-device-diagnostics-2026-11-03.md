@@ -127,3 +127,78 @@ Muse-Visual-Voicemail-1.1.0.apk, 25,001 bytes, SHA-256
 d91286fc88be942b19c42283c0042698722ac5437920516e56f300b5302b5b2b,
 versionCode 3, same signing cert (verified by direct sha256sum +
 apksigner + aapt2 read-back in the build session).
+
+## v1.2.0 — automation build (2026-11-03 ~00:47–01:00 EST)
+
+Jonathan approved automating the borrow: "Build it — trigger on new
+voicemail notifications." Three pieces:
+
+1. **ExportActivity** (new in the app): headless, ADB-started export to
+   `Download/MuseVoicemailExport.txt` via MediaStore, with a
+   machine-readable status header (OK / NO_ROLE / QUERY_BLOCKED, rows,
+   max_id, newest_date_ms); the file is written on failure too.
+2. **`automation/voicemail-borrow.sh`**: adb-ensure (3 retries — the
+   recovery connect races; observed live tonight: success, failure,
+   success seconds apart) → snapshot current dialer-role holder → if not
+   already Muse, `cmd role add-role-holder` + verify → fire
+   ExportActivity → poll the file's mtime (≤30s) → pull → parse, diff
+   `_ID`s against state for new rows → restore. Restore runs explicitly
+   before the verdict AND from an EXIT trap covering early exits; a
+   vacated role is re-filled by naming Samsung explicitly; a borrow that
+   finds Muse already holding the role leaves it as found.
+3. **Trigger wiring**: notification-trigger-registry.json gained
+   `voicemail-new` (title/body phrases "new voicemail" etc.,
+   wake_on_match=true, ordered right after `otp`; the registry
+   classifier's criteria are OR, so the worker leg package-gates:
+   tycho / Samsung dialer / incallui / samsung.vvm proceed, all other
+   senders are log-only). Classifier verified live against the drain's own
+   bash lib: Fi "New voicemail" → voicemail-new/wake; Fi promo → NOMATCH;
+   Samsung dialer "New voicemail" → voicemail-new; LinkedIn unchanged.
+   Routing-table row added under the Voice rows in the trigger-routing
+   skill the same handling.
+
+**APK**: Muse-Visual-Voicemail-1.2.0.apk, 29,097 bytes, SHA-256
+e1c46b7dd49192e39028f8b18e57352ba1e05c043678663d3d2ac557dd88b424,
+versionCode 4, same signing cert (verified by direct sha256sum +
+apksigner + aapt2 read-back; dex contains ExportActivity; classes.dex at
+APK root).
+
+**Install verified on-device over ADB** (~00:55 EST): in-place upgrade
+1.0.1 → 1.2.0 (Jonathan had never installed the v1.1.0 chat APK — the
+phone was still on 1.0.1), dumpsys read-back versionCode=4 /
+versionName=1.2.0. Default dialer at install time was already
+com.samsung.android.dialer (Jonathan had handed the role back himself).
+
+**First full borrow-cycle test**: pending at the time of writing — the
+ADB lane dropped to `offline` immediately after the install (the known
+wireless-debugging flakiness; keepalive last_ok 00:30 EST, Phone Bridge
+self-heal armed). The cycle's verdict, including whether Samsung's shell
+permits `cmd role` holder changes (the one capability not yet proven on
+this device), will be appended here from the first live run.
+
+**First full borrow-cycle test — PASSED (~00:50 EST, same night).** The
+lane recovered moments after the install and the script ran end-to-end
+on its first live attempt, exit 0:
+
+```
+BORROW_RESULT {"status": "OK", "rows": 161, "new_rows": 0,
+  "max_id": 7636, "restored": "yes",
+  "holder_before": "com.samsung.android.dialer",
+  "export": "automation/exports/export-1793685049.txt"}
+```
+
+- **The one unproven capability is now proven: Samsung's shell DOES
+  permit `cmd role add-role-holder` / `remove-role-holder`** for
+  ROLE_DIALER on this device — the borrow and the hand-back both took
+  effect, each verified by `get-role-holders` read-back inside the run.
+- Export file verified on read-back: header exact as designed; newest
+  row Oct 30, 2026 (id 7636). Baseline state recorded
+  (last_max_id 7636), so the next borrow reports only genuinely new
+  rows. `new_rows: 0` on this run is correct first-run behavior.
+- Postscript fix the same night: the restore verdict was tightened —
+  `restored: "yes"` now requires the read-back holder to actually be
+  Samsung (a vacant role no longer passes as restored).
+- What remains unproven: only the end-to-end *notification* leg — a real
+  Fi "New voicemail" notification flowing through the drain into a
+  borrow. The classifier half is unit-verified (above); the live half
+  happens on the next real voicemail.
