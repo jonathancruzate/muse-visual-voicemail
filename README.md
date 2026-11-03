@@ -242,4 +242,7 @@ automation/tag-lines.py          tags export rows PUBLIC (Google Voice) vs
                                  personal by matching Gmail Voice notifications
 automation/voice-sweep.py        sweeps the Voice-only inbox from Gmail
                                  notifications (transcripts included)
+automation/voice-check.py        forward lane: classifies NEW Voice
+                                 voicemails duplicate / Voice-only / pending
+                                 against the latest export (watermark-based)
 ```
