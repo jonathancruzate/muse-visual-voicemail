@@ -179,6 +179,13 @@ Jonathan granted ROLE_DIALER and re-ran Diagnostics + the main list:
   `voicemail-new`, Jonathan's order 2026-11-03: "trigger on new
   voicemail notifications"). Samsung Phone stays the default dialer
   between borrows, so Fi/Samsung keep handling new mail.
+- **Line tagging (`automation/tag-lines.py`):** the provider inbox
+  mixes both of Jonathan's lines — personal (Fi) and public (Google
+  Voice 631-619-3585, forwarded into the Fi mailbox). The tagger
+  matches each exported row against Gmail's voice-noreply "New
+  voicemail" notifications (same caller, ≤5 min) and writes a
+  `.tagged.txt`: baseline verdict 22 of 161 rows PUBLIC, 139 personal,
+  plus 85 Voice-only voicemails that never reached the provider.
 
 ## v1.1.0 changes (2026-11-03)
 
@@ -231,4 +238,6 @@ app/src/com/jonathancruzate/metamusevoicemail/
 app/build.sh                     raw toolchain build (see traps above)
 app/keystore/                    local only — NEVER committed
 automation/voicemail-borrow.sh   ADB borrow → export → pull → restore cycle
+automation/tag-lines.py          tags export rows PUBLIC (Google Voice) vs
+                                 personal by matching Gmail Voice notifications
 ```
