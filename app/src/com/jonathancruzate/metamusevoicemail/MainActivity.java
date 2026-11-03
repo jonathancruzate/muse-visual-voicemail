@@ -4,8 +4,11 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.role.RoleManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -79,7 +82,9 @@ public class MainActivity extends Activity {
         diag.setOnClickListener(v -> startActivity(new Intent(this, DiagnosticsActivity.class)));
         Button role = new Button(this); role.setText("Become default phone app");
         role.setOnClickListener(v -> confirmRoleRequest());
-        btns.addView(refresh); btns.addView(diag); btns.addView(role);
+        Button export = new Button(this); export.setText("Export all (text)");
+        export.setOnClickListener(v -> exportAll());
+        btns.addView(refresh); btns.addView(diag); btns.addView(role); btns.addView(export);
         root.addView(btns);
 
         list = new ListView(this);
@@ -264,6 +269,42 @@ public class MainActivity extends Activity {
         }
         status.setText(sb.toString());
         adapter.notifyDataSetChanged();
+    }
+
+    /** v1.1.0: export the whole visible inbox as plain text — copy to
+     *  clipboard AND offer the share sheet — so the messages can be handed
+     *  to Muse (or saved anywhere) WHILE the dialer role is held, before
+     *  the role is handed back to Samsung Phone and read access closes.
+     *  Text only: numbers, dates, durations, read state, transcriptions.
+     *  Audio stays in the provider; rows with has_content = 1 say so. */
+    private void exportAll() {
+        if (rows.isEmpty()) {
+            Toast.makeText(this, "Nothing to export — refresh first (read may need the dialer role)",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("MUSE VOICEMAIL EXPORT — ").append(rows.size()).append(" message(s)\n");
+        sb.append("Exported ").append(new SimpleDateFormat("EEE MMM d, yyyy h:mm a", Locale.US)
+                .format(new Date())).append("\n\n");
+        SimpleDateFormat fmt = new SimpleDateFormat("EEE MMM d, yyyy h:mm a", Locale.US);
+        for (Vm vm : rows) {
+            sb.append(vm.read ? "" : "NEW  ").append(displayNumber(vm.number))
+              .append("  ·  ").append(fmt.format(new Date(vm.date)))
+              .append("  ·  ").append(vm.duration).append("s")
+              .append("  ·  audio: ").append(vm.hasContent ? "available" : "not downloaded")
+              .append("  ·  source: ").append(vm.sourcePackage).append('\n');
+            sb.append(vm.transcription != null && !vm.transcription.trim().isEmpty()
+                    ? "\"" + vm.transcription.trim() + "\"" : "(no transcription)").append("\n\n");
+        }
+        String text = sb.toString();
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("muse-voicemail-export", text));
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType("text/plain");
+        share.putExtra(Intent.EXTRA_SUBJECT, "Muse Voicemail export (" + rows.size() + " messages)");
+        share.putExtra(Intent.EXTRA_TEXT, text);
+        startActivity(Intent.createChooser(share, "Export voicemail — also copied to clipboard"));
     }
 
     private void onRowTap(Vm vm) {

@@ -87,3 +87,43 @@ Jonathan installed v1.0.1 and re-ran Diagnostics (role still not held):
 Conclusion: the pre-role experiment is complete. The only remaining
 test is post-role: grant ROLE_DIALER, re-run Diagnostics, and read the
 unscoped row census by source package.
+
+## POST-ROLE VERDICT — the decisive test (2026-11-03, third + fourth screenshots)
+
+Jonathan granted ROLE_DIALER ("Become default phone app") and re-ran
+Diagnostics and the main list:
+
+- ROLE_DIALER held by us: true; default dialer package:
+  com.jonathancruzate.metamusevoicemail
+- READ_VOICEMAIL: granted; WRITE_VOICEMAIL: granted
+- Visual voicemail package (system): com.jonathancruzate.metamusevoicemail
+- **Voicemails, unscoped: total rows visible: 161 — source
+  com.google.android.apps.tycho: 161 (all of them).** The Google Fi app
+  ("tycho") is the source that mirrors voicemail into the shared
+  provider; Samsung writes nothing (samsung.vvm and incallui scoped
+  reads: 0 rows).
+- Rows without audio: 151 of 161 (only 10 rows have audio content in
+  the provider). Rows without transcription: 0 — every row carries a
+  transcription string, many of them Fi's literal "Transcript not
+  available" placeholder, the rest real transcriptions, all readable
+  in the main list (verified visually: Oct 30 → Sep 16 and older,
+  names/numbers/durations/sources per row).
+- Scoped to us: 0 (unchanged, expected).
+- Side effect in the screenshot: Samsung's "Call & text on other
+  devices turned off because it isn't supported by the default calling
+  and messaging apps" — check that setting after switching back.
+
+**Conclusion: the project works.** With the dialer role held, Muse
+Voicemail reads Jonathan's full Fi visual-voicemail inbox from the
+shared provider. Operating pattern: borrow the role to read/export,
+hand it back so the Fi/Samsung stack keeps handling new mail (Fi's
+platform VVM is disabled; our own sync is not a substitute).
+
+## v1.1.0 (same night)
+
+Adds **Export all (text)** to the main screen (clipboard + share sheet)
+so the inbox can be extracted during a role borrow. APK
+Muse-Visual-Voicemail-1.1.0.apk, 25,001 bytes, SHA-256
+d91286fc88be942b19c42283c0042698722ac5437920516e56f300b5302b5b2b,
+versionCode 3, same signing cert (verified by direct sha256sum +
+apksigner + aapt2 read-back in the build session).

@@ -6,11 +6,12 @@ built for a Galaxy S24+ whose stock client is Samsung Visual Voicemail
 (`com.samsung.vvm`, v20.1.00.17).
 
 - **Package:** `com.jonathancruzate.metamusevoicemail`
-- **Version:** 1.0.1 (versionCode 2), minSdk 29, targetSdk 35
-- **APK:** `app/Muse-Visual-Voicemail-1.0.1.apk` — 25,001 bytes,
-  SHA-256 `f11d7c89335767b4597e12eabda51d464fc489f672cac92918c472c0f4b82bc8`
-  (v1.0.0 was also 25,001 bytes, SHA-256 `1279979e…d66b` — same size,
-  different build; the hashes are the distinguishing check)
+- **Version:** 1.1.0 (versionCode 3), minSdk 29, targetSdk 35
+- **APK:** `app/Muse-Visual-Voicemail-1.1.0.apk` — 25,001 bytes,
+  SHA-256 `d91286fc88be942b19c42283c0042698722ac5437920516e56f300b5302b5b2b`
+  (v1.0.1: 25,001 bytes, SHA-256 `f11d7c89…b82bc8`; v1.0.0: 25,001 bytes,
+  SHA-256 `1279979e…d66b` — all three builds land on the same padded size;
+  the hashes are the distinguishing check)
 - **Signing cert SHA-256:** `e9505aa1e0087583c5b3da1dc59ce533f84b719c2da4abb01daffc230cc0f32b`
   (CN=Muse Voicemail, O=JonathanCruzate, C=US; keystore stays local, never in git)
 
@@ -125,6 +126,39 @@ Jonathan installed v1.0.0 and sent the Diagnostics screenshot:
   expected pre-role state, not a defect.
 - System visual-voicemail package: `com.samsung.android.incallui`.
 
+## Post-role verdict — IT WORKS (2026-11-03, v1.0.1)
+
+Jonathan granted ROLE_DIALER and re-ran Diagnostics + the main list:
+
+- ROLE_DIALER held; default dialer = this app; READ/WRITE_VOICEMAIL
+  granted; system VVM package became this app.
+- **Unscoped census: 161 rows visible, ALL with source
+  `com.google.android.apps.tycho` — the Google Fi app.** The mirroring
+  source was never Samsung: the Fi app writes every voicemail into the
+  shared provider. **Rows without transcription: 0** (many carry Fi's
+  literal "Transcript not available" placeholder; the rest carry real
+  transcriptions, readable in the list). **Rows without audio: 151 of
+  161** — only 10 rows have downloaded audio in the provider; the
+  transcription is the usable content for the rest.
+- The list UI renders the full inbox (dates back months, NEW flags,
+  durations, per-row source) — the original goal of this project:
+  **Muse can read Jonathan's visual voicemail.**
+- Side effect observed: Samsung's "Call & text on other devices" was
+  auto-turned-off when the default calling app changed (system toast in
+  the diagnostics screenshot). Check/re-enable it after switching the
+  default phone app back to Samsung Phone.
+- Operating pattern (per the Fi `vvm_type_disabled` finding): borrow
+  the role to read, hand it back so Samsung/Fi keep handling new mail.
+  v1.1.0's Export exists to extract the inbox during a borrow.
+
+## v1.1.0 changes (2026-11-03)
+
+- **Export all (text)** button on the main screen: formats every loaded
+  row (number, date, duration, NEW/read, audio availability, source,
+  transcription) as plain text, copies it to the clipboard, and opens
+  the share sheet — the extraction lane for handing the inbox to Muse
+  while the role is held, before handing the role back.
+
 ## v1.0.1 changes (2026-11-03)
 
 - **Bug fixed:** v1.0.0 queried only the *unscoped* provider URI, which the
@@ -140,9 +174,10 @@ Jonathan installed v1.0.0 and sent the Diagnostics screenshot:
 
 ## Install & first run
 
-1. Sideload `Muse-Visual-Voicemail-1.0.1.apk` on the phone (Files → tap → allow
-   install from that source). Upgrading from 1.0.0 keeps the same signing
-   cert, so it installs in place.
+1. Sideload `Muse-Visual-Voicemail-1.1.0.apk` on the phone (Files → tap → allow
+   install from that source). Upgrading keeps the same signing
+   cert, so it installs in place — and an in-place upgrade keeps the
+   dialer role if the app currently holds it.
 2. Open it, grant the runtime permissions it asks for.
 3. Read the status line: it will say whether Android blocked the query or
    returned rows. Open **Diagnostics** and copy the report back to Muse —
