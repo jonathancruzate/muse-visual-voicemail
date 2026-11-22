@@ -13,8 +13,8 @@ BT="$SDK/build-tools/35.0.0"
 ANDROID_JAR="$SDK/platforms/android-35/android.jar"
 KS="keystore/musevvm.keystore"
 KS_PASS_FILE="keystore/keystore-password.txt"
-VERSION_CODE=4
-VERSION_NAME="1.2.0"
+VERSION_CODE=5
+VERSION_NAME="1.2.1"
 
 rm -rf build
 mkdir -p build/gen build/classes build/dex keystore
@@ -30,13 +30,15 @@ if [ ! -f "$KS" ]; then
 fi
 PASS="$(cat "$KS_PASS_FILE")"
 
-echo "== aapt2 link (manifest only, no res) =="
+echo "== aapt2 compile + link (res added v1.2.1 for the Muse app icon set) =="
+"$BT/aapt2" compile --dir res -o build/res.zip
 "$BT/aapt2" link -o build/unsigned.apk \
   -I "$ANDROID_JAR" \
   --manifest AndroidManifest.xml \
   --java build/gen \
   --min-sdk-version 29 --target-sdk-version 35 \
-  --version-code "$VERSION_CODE" --version-name "$VERSION_NAME"
+  --version-code "$VERSION_CODE" --version-name "$VERSION_NAME" \
+  build/res.zip
 
 echo "== javac =="
 find src build/gen -name "*.java" > build/sources.txt

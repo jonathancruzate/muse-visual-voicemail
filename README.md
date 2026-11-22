@@ -1,3 +1,11 @@
+# DEPRECATED (2026-11-21)
+
+This project is DEPRECATED. Muse Voicemail was folded into Muse
+Device Assistance v1.30.0 as the optional Voicemail module. Do not
+install or use this standalone app. The live code, skill and
+automation are in `~/workspace/muse-device-assistance/` (automation:
+`voicemail-automation/` there). This project is kept for history only.
+
 # Muse Voicemail
 
 A sideloaded Android app that reads and displays **visual voicemail** from the
@@ -246,3 +254,15 @@ automation/voice-check.py        forward lane: classifies NEW Voice
                                  voicemails duplicate / Voice-only / pending
                                  against the latest export (watermark-based)
 ```
+
+## v1.2.1 (2026-11-21) — unique Muse app icon (project remains DEPRECATED)
+
+Icon-only release (versionCode 5), built because the approved Muse app
+icon set includes this app: original Muse blue M on a light tile plus a
+teal voicemail-reels badge, superseding the 2026-11-01 all-same-icon rule.
+The app previously used the stock `@android:drawable/sym_action_call`;
+it now has a real res/ tree (mipmaps + round + adaptive icon, background
+#F0F2F5, foreground at 76% centred) and build.sh compiles/links it.
+Verified: icon extracted from the built APK matches the approved art;
+apksigner verify passed. APK: app/Muse-Visual-Voicemail-1.2.1.apk,
+SHA-256 `f7fcca6f6d55df447e288475f08f2ab0206edccf4a1e90217bebcf8e02e89f9e`. Per the deprecation above, do NOT install; kept for history.
